@@ -1,4 +1,4 @@
-use todo::todo::{
+use todo_list::MyTodoList::{
     IMyTodoListDispatcher, IMyTodoListSafeDispatcher, IMyTodoListSafeDispatcherTrait,
     IMyTodoListDispatcherTrait,
 };
@@ -31,7 +31,7 @@ fn test_add_task_owner() {
     start_cheat_caller_address(contract_address, OWNER());
     let task_name = todo.add_task('Submit assignment');
     stop_cheat_caller_address(contract_address);
-    assert!(task_name == 1, "Task name expected to be Submit assignment");
+    assert!(task_name == 'Submit assignment', "Task name expected to be Submit assignment");
 }
 
 #[test]
@@ -50,8 +50,8 @@ fn test_complete_task() {
     let contract_address = deploy_contract(0);
     let todo = IMyTodoListDispatcher { contract_address };
     start_cheat_caller_address(contract_address, OWNER());
-    let task_id = todo.add_task('Complete your cleanup');
-    todo.complete_task(task_id);
+    let task_name = todo.add_task('Complete your cleanup');
+    todo.complete_task(task_name);
     stop_cheat_caller_address(contract_address);
 }
 
@@ -62,13 +62,13 @@ fn test_delete_task_not_owner() {
     let contract_address = deploy_contract(0);
     let todo = IMyTodoListSafeDispatcher { contract_address };
     start_cheat_caller_address(contract_address, OWNER());
-    let task_id_result = todo.add_task('Prepare weekend summary');
-    assert!(task_id_result.is_ok(), "Owner should be able to create task");
-    let task_id = task_id_result.unwrap();
+    let task_name_result = todo.add_task('Prepare weekend summary');
+    assert!(task_name_result.is_ok(), "Owner should be able to create task");
+    let task_name = task_name_result.unwrap();
     stop_cheat_caller_address(contract_address);
 
     start_cheat_caller_address(contract_address, EBUKA());
-    let result = todo.delete_task(task_id);
+    let result = todo.delete_task(task_name);
     stop_cheat_caller_address(contract_address);
     assert!(result.is_err(), "User without permission cannot delete task");
 }
