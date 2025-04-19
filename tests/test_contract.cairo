@@ -1,47 +1,87 @@
+use todo::todo::{
+    IMyTodoListDispatcher, IMyTodoListSafeDispatcher, IMyTodoListSafeDispatcherTrait,
+    IMyTodoListDispatcherTrait,
+};
+use snforge_std::{
+    ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
+    stop_cheat_caller_address,
+};
 use starknet::ContractAddress;
 
-use snforge_std::{declare, ContractClassTrait, DeclareResultTrait};
+pub fn OWNER() -> ContractAddress {
+    'OWNER'.try_into().unwrap()
+}
+pub fn EBUKA() -> ContractAddress {
+    'EBUKA'.try_into().unwrap()
+}
 
-use todo_list_contract::IHelloStarknetSafeDispatcher;
-use todo_list_contract::IHelloStarknetSafeDispatcherTrait;
-use todo_list_contract::IHelloStarknetDispatcher;
-use todo_list_contract::IHelloStarknetDispatcherTrait;
-
-fn deploy_contract(name: ByteArray) -> ContractAddress {
-    let contract = declare(name).unwrap().contract_class();
-    let (contract_address, _) = contract.deploy(@ArrayTrait::new()).unwrap();
+fn deploy_contract(initial_count: u64) -> ContractAddress {
+    let class_hash = declare("MyTodoList").unwrap().contract_class();
+    let mut calldata = array![];
+    OWNER().serialize(ref calldata);
+    initial_count.serialize(ref calldata);
+    let (contract_address, _) = class_hash.deploy(@calldata).unwrap();
     contract_address
 }
 
 #[test]
-fn test_increase_balance() {
-    let contract_address = deploy_contract("HelloStarknet");
-
-    let dispatcher = IHelloStarknetDispatcher { contract_address };
-
-    let balance_before = dispatcher.get_balance();
-    assert(balance_before == 0, 'Invalid balance');
-
-    dispatcher.increase_balance(42);
-
-    let balance_after = dispatcher.get_balance();
-    assert(balance_after == 42, 'Invalid balance');
+fn test_add_task_owner() {
+    let contract_address = deploy_contract(0);
+    let todo = IMyTodoListDispatcher { contract_address };
+    start_cheat_caller_address(contract_address, OWNER());
+    let task_name = todo.add_task('Submit assignment');
+    stop_cheat_caller_address(contract_address);
+    assert!(task_name == 1, "Task name expected to be Submit assignment");
 }
 
 #[test]
 #[feature("safe_dispatcher")]
-fn test_cannot_increase_balance_with_zero_value() {
-    let contract_address = deploy_contract("HelloStarknet");
+fn test_add_task_not_owner() {
+    let contract_address = deploy_contract(0);
+    let todo = IMyTodoListSafeDispatcher { contract_address };
+    start_cheat_caller_address(contract_address, EBUKA());
+    let result = todo.add_task('I am not authorized');
+    stop_cheat_caller_address(contract_address);
+    assert!(result.is_err(), "Not allowed to add task because you are not owner");
+}
 
-    let safe_dispatcher = IHelloStarknetSafeDispatcher { contract_address };
+#[test]
+fn test_complete_task() {
+    let contract_address = deploy_contract(0);
+    let todo = IMyTodoListDispatcher { contract_address };
+    start_cheat_caller_address(contract_address, OWNER());
+    let task_id = todo.add_task('Complete your cleanup');
+    todo.complete_task(task_id);
+    stop_cheat_caller_address(contract_address);
+}
 
-    let balance_before = safe_dispatcher.get_balance().unwrap();
-    assert(balance_before == 0, 'Invalid balance');
 
-    match safe_dispatcher.increase_balance(0) {
-        Result::Ok(_) => core::panic_with_felt252('Should have panicked'),
-        Result::Err(panic_data) => {
-            assert(*panic_data.at(0) == 'Amount cannot be 0', *panic_data.at(0));
-        }
-    };
+#[test]
+#[feature("safe_dispatcher")]
+fn test_delete_task_not_owner() {
+    let contract_address = deploy_contract(0);
+    let todo = IMyTodoListSafeDispatcher { contract_address };
+    start_cheat_caller_address(contract_address, OWNER());
+    let task_id_result = todo.add_task('Prepare weekend summary');
+    assert!(task_id_result.is_ok(), "Owner should be able to create task");
+    let task_id = task_id_result.unwrap();
+    stop_cheat_caller_address(contract_address);
+
+    start_cheat_caller_address(contract_address, EBUKA());
+    let result = todo.delete_task(task_id);
+    stop_cheat_caller_address(contract_address);
+    assert!(result.is_err(), "User without permission cannot delete task");
+}
+
+#[test]
+fn test_get_all_tasks() {
+    let contract_address = deploy_contract(0);
+    let todo = IMyTodoListDispatcher { contract_address };
+    start_cheat_caller_address(contract_address, OWNER());
+    todo.add_task('This remains');
+    todo.add_task('This is deleted');
+    todo.delete_task(2);
+    let tasks = todo.get_all_tasks();
+    stop_cheat_caller_address(contract_address);
+    assert!(tasks.len() == 1, "Result length is incorrect");
 }
