@@ -1,7 +1,8 @@
-use todo_list::MyTodoList::{
+use todo_list_contract::todo_list::{
     IMyTodoListDispatcher, IMyTodoListSafeDispatcher, IMyTodoListSafeDispatcherTrait,
     IMyTodoListDispatcherTrait,
 };
+
 use snforge_std::{
     ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
     stop_cheat_caller_address,
@@ -29,9 +30,12 @@ fn test_add_task_owner() {
     let contract_address = deploy_contract(0);
     let todo = IMyTodoListDispatcher { contract_address };
     start_cheat_caller_address(contract_address, OWNER());
-    let task_name = todo.add_task('Submit assignment');
+    let task_name = todo.add_task('', 'Upload assignment to repo');
     stop_cheat_caller_address(contract_address);
-    assert!(task_name == 'Submit assignment', "Task name expected to be Submit assignment");
+    assert!(
+        task_name == 'Upload assignment to repo',
+        "Task name expected to be Upload assignment to repo",
+    );
 }
 
 #[test]
@@ -40,7 +44,7 @@ fn test_add_task_not_owner() {
     let contract_address = deploy_contract(0);
     let todo = IMyTodoListSafeDispatcher { contract_address };
     start_cheat_caller_address(contract_address, EBUKA());
-    let result = todo.add_task('I am not authorized');
+    let result = todo.add_task('', 'I am not authorized');
     stop_cheat_caller_address(contract_address);
     assert!(result.is_err(), "Not allowed to add task because you are not owner");
 }
@@ -50,7 +54,7 @@ fn test_complete_task() {
     let contract_address = deploy_contract(0);
     let todo = IMyTodoListDispatcher { contract_address };
     start_cheat_caller_address(contract_address, OWNER());
-    let task_name = todo.add_task('Complete your cleanup');
+    let task_name = todo.add_task('', 'Complete your cleanup');
     todo.complete_task(task_name);
     stop_cheat_caller_address(contract_address);
 }
@@ -78,8 +82,8 @@ fn test_get_all_tasks() {
     let contract_address = deploy_contract(0);
     let todo = IMyTodoListDispatcher { contract_address };
     start_cheat_caller_address(contract_address, OWNER());
-    todo.add_task('This remains');
-    todo.add_task('This is deleted');
+    todo.add_task('', 'This remains');
+    todo.add_task('', 'This is deleted');
     todo.delete_task(2);
     let tasks = todo.get_all_tasks();
     stop_cheat_caller_address(contract_address);

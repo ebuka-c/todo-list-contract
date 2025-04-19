@@ -5,7 +5,6 @@ pub struct Task {
     is_completed: bool,
 }
 
-
 #[starknet::interface]
 pub trait IMyTodoList<TContractState> {
     /// add task function.
@@ -15,12 +14,14 @@ pub trait IMyTodoList<TContractState> {
     /// delete task function.
     fn delete_task(self: @TContractState, task_name: felt252) -> bool;
     /// get all tasks function.
-    fn get_all_tasks(self: @TContractState);
+    fn get_all_tasks(self: @TContractState) -> Array<Task>;
 }
 
 /// contract for managing tasks
 #[starknet::contract]
 pub mod MyTodoList {
+    use starknet::storage::StoragePathEntry;
+    use super::IMyTodoList;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
     use starknet::event::EventEmitter;
@@ -28,7 +29,6 @@ pub mod MyTodoList {
         Map, StoragePointerReadAccess, StoragePointerWriteAccess, StorageMapWriteAccess,
         StorageMapReadAccess,
     };
-
 
     use super::{Task};
 
@@ -55,12 +55,12 @@ pub mod MyTodoList {
 
     #[derive(Drop, starknet::Event)]
     struct TaskCompleted {
-        task_id: u64,
+        task_name: felt252,
     }
 
     #[derive(Drop, starknet::Event)]
     struct TaskDeleted {
-        task_id: u64,
+        task_name: felt252,
     }
 
     #[constructor]
@@ -75,7 +75,9 @@ pub mod MyTodoList {
             let caller = get_caller_address();
             assert!(self.owner.read() == caller, "Only owner can add tasks");
 
-            self.tasks.write(task_name, true);
+            let newTask = Task { name: task_name, description, is_completed: false };
+
+            self.tasks.write(task_name, newTask);
             self.emit(Added { task_name, description });
         }
 
@@ -89,6 +91,7 @@ pub mod MyTodoList {
             assert(!task.is_completed, 'Task already completed');
 
             task.is_completed = true;
+            // self.tasks.entry(task_name).write(task);
             self.tasks.write(task_name, task);
 
             self.emit(TaskCompleted { task_id });
@@ -110,6 +113,12 @@ pub mod MyTodoList {
             true
         }
 
-        fn get_all_tasks(self: @ContractState) {}
+        fn get_all_tasks(self: @ContractState) -> Array<Task> {
+            let mut result = ArrayTrait::new();
+            // let tasks_count = self.taskCount.read();
+            result = self.tasks.read();
+            result
+        }
     }
 }
+
